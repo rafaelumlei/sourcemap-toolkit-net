@@ -3,71 +3,64 @@ using System.IO;
 
 using Newtonsoft.Json;
 
-namespace SourcemapToolkit.SourcemapParser
+namespace SourcemapToolkit.SourcemapParser;
+
+public class SourceMapParser
 {
-	public class SourceMapParser
+	private readonly MappingsListParser _mappingsListParser;
+	private readonly bool _removeSourcesContent;
+
+	public SourceMapParser(bool removeSourcesContent = false)
 	{
-		private readonly MappingsListParser _mappingsListParser;
-		private readonly bool _removeSourcesContent;
+		_mappingsListParser = new();
+		_removeSourcesContent = removeSourcesContent;
+	}
 
-		public SourceMapParser(bool removeSourcesContent = false)
+	/// <summary>
+	/// Parses a stream representing a source map into a SourceMap object.
+	/// </summary>
+	public SourceMap ParseSourceMap(StreamReader sourceMapStream)
+	{
+		if (sourceMapStream == null) return  null;
+
+		using var jsonTextReader = new JsonTextReader(sourceMapStream);
+		var sourceMap = new JsonSerializer().Deserialize<SourceMapDeserializable>(jsonTextReader);
+
+		// since SourceMap is immutable we need to allocate a new one and copy over all the information
+		var mappings = _mappingsListParser.ParseMappings(sourceMap.Mappings, sourceMap.Names, sourceMap.Sources);
+
+		// Resize to free unused memory
+		RemoveExtraSpaceFromList(mappings);
+		RemoveExtraSpaceFromList(sourceMap.Sources);
+		RemoveExtraSpaceFromList(sourceMap.Names);
+
+		if (_removeSourcesContent && sourceMap.SourcesContent != null)
 		{
-			_mappingsListParser = new MappingsListParser();
-			_removeSourcesContent = removeSourcesContent;
+			sourceMap.SourcesContent.Clear();
+		}
+		else
+		{
+			RemoveExtraSpaceFromList(sourceMap.SourcesContent);
 		}
 
-		/// <summary>
-		/// Parses a stream representing a source map into a SourceMap object.
-		/// </summary>
-		public SourceMap ParseSourceMap(StreamReader sourceMapStream)
+		var result = new SourceMap(
+			version: sourceMap.Version,
+			file: sourceMap.File,
+			mappings: sourceMap.Mappings,
+			sources: sourceMap.Sources,
+			names: sourceMap.Names,
+			parsedMappings: mappings,
+			sourcesContent: sourceMap.SourcesContent);
+
+		sourceMapStream.Close();
+		return result;
+	}
+
+	private void RemoveExtraSpaceFromList<T>(List<T> list)
+	{
+		if (list != null)
 		{
-			if (sourceMapStream == null)
-			{
-				return null;
-			}
-			using (JsonTextReader jsonTextReader = new JsonTextReader(sourceMapStream))
-			{
-				JsonSerializer serializer = new JsonSerializer();
-
-				SourceMapDeserializable deserializedSourceMap = serializer.Deserialize<SourceMapDeserializable>(jsonTextReader);
-
-				// Since SourceMap is immutable we need to allocate a new one and copy over all the information
-				List<MappingEntry> parsedMappings = _mappingsListParser.ParseMappings(deserializedSourceMap.Mappings, deserializedSourceMap.Names, deserializedSourceMap.Sources);
-
-				// Resize to free unused memory
-				RemoveExtraSpaceFromList(parsedMappings);
-				RemoveExtraSpaceFromList(deserializedSourceMap.Sources);
-				RemoveExtraSpaceFromList(deserializedSourceMap.Names);
-
-				if (_removeSourcesContent && deserializedSourceMap.SourcesContent != null)
-				{
-					deserializedSourceMap.SourcesContent.Clear();
-				}
-				else
-				{
-					RemoveExtraSpaceFromList(deserializedSourceMap.SourcesContent);
-				}
-
-				SourceMap result = new SourceMap(
-					version: deserializedSourceMap.Version,
-					file: deserializedSourceMap.File,
-					mappings: deserializedSourceMap.Mappings,
-					sources: deserializedSourceMap.Sources,
-					names: deserializedSourceMap.Names,
-					parsedMappings: parsedMappings,
-					sourcesContent: deserializedSourceMap.SourcesContent);
-
-				sourceMapStream.Close();
-				return result;
-			}
-		}
-
-		private void RemoveExtraSpaceFromList<T>(List<T> list)
-		{
-			if (list != null)
-			{
-				list.Capacity = list.Count;
-			}
+			list.Capacity = list.Count;
 		}
 	}
 }

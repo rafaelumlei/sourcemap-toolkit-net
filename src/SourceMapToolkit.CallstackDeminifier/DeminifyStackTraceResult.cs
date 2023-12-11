@@ -1,52 +1,52 @@
 ﻿using SourcemapToolkit.SourcemapParser;
 using System.Collections.Generic;
 using System.Text;
+using SourcemapToolkit.CallstackDeminifier.StackFrameDeminifiers;
 
-namespace SourcemapToolkit.CallstackDeminifier
+namespace SourcemapToolkit.CallstackDeminifier;
+
+public class DeminifyStackTraceResult
 {
-	public class DeminifyStackTraceResult
+	public string Message { get; }
+	public IReadOnlyList<StackFrame> MinifiedStackFrames { get; }
+	public IReadOnlyList<StackFrameDeminificationResult> DeminifiedStackFrameResults { get; }
+
+	public DeminifyStackTraceResult(
+		string message,
+		IReadOnlyList<StackFrame> minifiedStackFrames,
+		IReadOnlyList<StackFrameDeminificationResult> deminifiedStackFrameResults)
 	{
-		public string Message { get; }
-		public IReadOnlyList<StackFrame> MinifiedStackFrames { get; }
-		public IReadOnlyList<StackFrameDeminificationResult> DeminifiedStackFrameResults { get; }
+		Message = message;
+		MinifiedStackFrames = minifiedStackFrames;
+		DeminifiedStackFrameResults = deminifiedStackFrameResults;
+	}
+	
+	public override string ToString()
+	{
+		var sb = new StringBuilder();
 
-		public override string ToString()
+		if (!string.IsNullOrEmpty(Message))
 		{
-			StringBuilder sb = new StringBuilder();
-
-			if (!string.IsNullOrEmpty(Message))
-			{
-				sb.Append(Message);
-			}
-
-			for (int i = 0; i < DeminifiedStackFrameResults.Count; i++)
-			{
-				StackFrame deminFrame = DeminifiedStackFrameResults[i].DeminifiedStackFrame;
-
-				// Use deminified info wherever possible, merging if necessary so we always print a full frame
-				StackFrame frame = new StackFrame()
-				{
-					MethodName = deminFrame.MethodName ?? MinifiedStackFrames[i].MethodName,
-					SourcePosition = deminFrame.SourcePosition != SourcePosition.NotFound ? deminFrame.SourcePosition : MinifiedStackFrames[i].SourcePosition,
-					FilePath = deminFrame.SourcePosition != SourcePosition.NotFound ? deminFrame.FilePath : MinifiedStackFrames[i].FilePath
-				};
-
-				sb.AppendLine();
-				sb.Append("  ");
-				sb.Append(frame);
-			}
-
-			return sb.ToString();
+			sb.Append(Message);
 		}
 
-		public DeminifyStackTraceResult(
-			string message,
-			IReadOnlyList<StackFrame> minifiedStackFrames,
-			IReadOnlyList<StackFrameDeminificationResult> deminifiedStackFrameResults)
+		for (var i = 0; i < DeminifiedStackFrameResults.Count; i++)
 		{
-			Message = message;
-			MinifiedStackFrames = minifiedStackFrames;
-			DeminifiedStackFrameResults = deminifiedStackFrameResults;
+			var deminFrame = DeminifiedStackFrameResults[i].StackFrame;
+
+			// Use deminified info wherever possible, merging if necessary so we always print a full frame
+			var frame = new StackFrame()
+			{
+				MethodName = deminFrame.MethodName ?? MinifiedStackFrames[i].MethodName,
+				SourcePosition = deminFrame.SourcePosition != SourcePosition.NotFound ? deminFrame.SourcePosition : MinifiedStackFrames[i].SourcePosition,
+				FilePath = deminFrame.SourcePosition != SourcePosition.NotFound ? deminFrame.FilePath : MinifiedStackFrames[i].FilePath
+			};
+
+			sb.AppendLine();
+			sb.Append("  ");
+			sb.Append(frame);
 		}
+
+		return sb.ToString();
 	}
 }
